@@ -52,9 +52,11 @@ window.game2d.controller.moveStuff = function(){
     playerData.vtr.x = playerData.vtr.x - playerData.vtr.x * speed;
     playerData.vtr.y = playerData.vtr.y - playerData.vtr.y * speed;
     if (Math.abs(playerData.vtr.x) < 0.001) {
+        playerData.pos.x = Math.round(playerData.pos.x);
         playerData.vtr.x = 0; 
     } 
     if (Math.abs(playerData.vtr.y) < 0.001) {
+        playerData.pos.y =  Math.round(playerData.pos.y);
         playerData.vtr.y = 0;
     }
     requestAnimationFrame(window.game2d.controller.moveStuff); 
