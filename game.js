@@ -78,7 +78,7 @@ window.game2d.controller.processKeyInput = function(event){
     switch (keyCode){
         case interestingKeyCodes.left:
             console.log('left');
-            if (worldData[Math.floor(playerData.pos.y)][Math.floor(playerData.pos.x-1)] != 0){
+            if (worldData[Math.round(playerData.pos.y)][Math.round(playerData.pos.x-1)] != 0){
                 console.log('block');
                 return;
             }
@@ -86,7 +86,7 @@ window.game2d.controller.processKeyInput = function(event){
             break;
         case interestingKeyCodes.right:
             console.log('right');
-            if (worldData[Math.floor(playerData.pos.y)][Math.floor(playerData.pos.x+1)] != 0){
+            if (worldData[Math.round(playerData.pos.y)][Math.round(playerData.pos.x+1)] != 0){
                 console.log('block');
                 return;
             }
@@ -94,7 +94,7 @@ window.game2d.controller.processKeyInput = function(event){
             break;
         case interestingKeyCodes.up:
             console.log('up!');
-            if (worldData[Math.floor(playerData.pos.y-1)][Math.floor(playerData.pos.x)] != 0){
+            if (worldData[Math.round(playerData.pos.y-1)][Math.round(playerData.pos.x)] != 0){
                 console.log('block');
                 return;
             }
@@ -102,7 +102,7 @@ window.game2d.controller.processKeyInput = function(event){
             break;
         case interestingKeyCodes.down:
             console.log('down');
-            if (worldData[Math.floor(playerData.pos.y+1)][Math.floor(playerData.pos.x)] != 0){
+            if (worldData[Math.round(playerData.pos.y)+1][Math.round(playerData.pos.x)] != 0){
                 console.log('block');
                 return;
             }
