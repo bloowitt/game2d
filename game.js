@@ -38,79 +38,100 @@ window.game2d.controller.decreaseAbsValueByAmount = function(quantity, amount){
     }
 };
 
+window.game2d.controller.getUpdatedVector = function(playerVector, keyStatus, speed) {
+    var x = playerVector.x; 
+    var y = playerVector.y;
+    var capAbsValue = function(value, cap){
+        var valueAbs = Math.abs(value);
+        if (valueAbs > cap){
+            return cap * valueAbs/value; 
+        }
+        return value;
+    };
+    if (keyStatus.isDown(keyStatus.UP)){
+        y -= 1;
+    }
+    if (keyStatus.isDown(keyStatus.DOWN)){
+        y += 1;
+    }
+    if (keyStatus.isDown(keyStatus.RIGHT)){
+        x += 1;
+    }
+    if (keyStatus.isDown(keyStatus.LEFT)){
+        x -= 1;
+    }
+    // reduce the movement by the speed for this iteration
+    x = x - x * speed;
+    y = y - y * speed;
+    return {x: capAbsValue(x, 1), y: capAbsValue(y, 1)};
+};
+
+window.game2d.controller.getUpdatedPosition= function(pos, vtr, terrain, speed){
+    var maintainWithinBounds = function(value, minBound, maxBound){
+        if (value < minBound){
+            return minBound;
+        }
+        if (value > maxBound){
+            return maxBound;
+        }
+        return value;
+    };
+    var x = pos.x + vtr.x * speed;
+    var y = pos.y + vtr.y * speed;
+    if (terrain[Math.floor(y)][Math.floor(x+0.5)] == 1){
+        x = Math.floor(x) +0.5;
+    }
+    if (terrain[Math.floor(y)][Math.floor(x-0.5)] == 1){
+        x = Math.floor(x) +0.5;
+    }
+    if (terrain[Math.floor(y+0.5)][Math.floor(x)] == 1){
+        y = Math.floor(y) + 0.5;
+    }
+    if (terrain[Math.floor(y-0.5)][Math.floor(x)] == 1){
+        y = Math.floor(y) + 0.5;
+    }
+    return {x: maintainWithinBounds(x, 0, terrain[0].length), y: maintainWithinBounds(y, 0, terrain.length)};
+};
+
 window.game2d.controller.moveStuff = function(){
     if (window.game2d.controller.lastTick === undefined){
         window.game2d.controller.lastTick = Date.now();
     }
     var now = Date.now();
     var ellapsedSeconds = (now - window.game2d.controller.lastTick)/1000;
-    window.game2d.controller.lastTick = now;
     var playerData = window.game2d.model.player;
+    var keyStatus = window.game2d.controller.keyStatus;
     var speed = playerData.speed * ellapsedSeconds;
-    playerData.pos.x = playerData.pos.x + playerData.vtr.x * speed;
-    playerData.pos.y = playerData.pos.y + playerData.vtr.y * speed;
-    playerData.vtr.x = playerData.vtr.x - playerData.vtr.x * speed;
-    playerData.vtr.y = playerData.vtr.y - playerData.vtr.y * speed;
-    if (Math.abs(playerData.vtr.x) < 0.001) {
-        playerData.pos.x = Math.round(playerData.pos.x);
-        playerData.vtr.x = 0; 
-    } 
-    if (Math.abs(playerData.vtr.y) < 0.001) {
-        playerData.pos.y =  Math.round(playerData.pos.y);
-        playerData.vtr.y = 0;
-    }
+    playerData.vtr = window.game2d.controller.getUpdatedVector(playerData.vtr, keyStatus, speed);
+    playerData.pos = window.game2d.controller.getUpdatedPosition(playerData.pos, playerData.vtr, window.game2d.model.terrain, speed);
+    window.game2d.controller.lastTick = now;
     requestAnimationFrame(window.game2d.controller.moveStuff); 
 };
 requestAnimationFrame(window.game2d.controller.moveStuff);
 
-window.game2d.controller.processKeyInput = function(event){
-    console.log('Look ma, key event');
-    var interestingKeyCodes = {
-        left: 37, up: 38, right: 39, down: 40 
-    };
-    var playerData = window.game2d.model.player;
-    if (Math.abs(playerData.vtr.x) > 0.2 || Math.abs(playerData.vtr.y) > 0.2) {
-        console.log('moving; ignore input');
-        return 0;
-    }
-    var worldData = window.game2d.model.terrain;
-    var keyCode = event.keyCode;
-    switch (keyCode){
-        case interestingKeyCodes.left:
-            console.log('left');
-            if (worldData[Math.round(playerData.pos.y)][Math.round(playerData.pos.x-1)] != 0){
-                console.log('block');
-                return;
-            }
-            playerData.vtr.x -= 1;
-            break;
-        case interestingKeyCodes.right:
-            console.log('right');
-            if (worldData[Math.round(playerData.pos.y)][Math.round(playerData.pos.x+1)] != 0){
-                console.log('block');
-                return;
-            }
-            playerData.vtr.x += 1;
-            break;
-        case interestingKeyCodes.up:
-            console.log('up!');
-            if (worldData[Math.round(playerData.pos.y-1)][Math.round(playerData.pos.x)] != 0){
-                console.log('block');
-                return;
-            }
-            playerData.vtr.y -= 1;
-            break;
-        case interestingKeyCodes.down:
-            console.log('down');
-            if (worldData[Math.round(playerData.pos.y)+1][Math.round(playerData.pos.x)] != 0){
-                console.log('block');
-                return;
-            }
-            playerData.vtr.y += 1;
-            break;
-    }
+window.game2d.controller.keyStatus = {
+  _pressed: {},
+
+  LEFT: 37,
+  UP: 38,
+  RIGHT: 39,
+  DOWN: 40,
+  
+  isDown: function(keyCode) {
+    return this._pressed[keyCode];
+  },
+  
+  onKeydown: function(event) {
+    this._pressed[event.keyCode] = true;
+  },
+  
+  onKeyup: function(event) {
+    delete this._pressed[event.keyCode];
+  }
 };
-window.addEventListener('keydown', window.game2d.controller.processKeyInput, true);
+
+window.addEventListener('keyup', function(event) { window.game2d.controller.keyStatus.onKeyup(event); }, false);
+window.addEventListener('keydown', function(event) { window.game2d.controller.keyStatus.onKeydown(event); }, false);
 
 // RENDER PARTS
 window.game2d.render = window.game2d.render || {};
@@ -146,9 +167,9 @@ window.game2d.render.drawTerrain = function(canvasElement, playerPos, tileData, 
     context.fillStyle = 'black';
     context.fillRect(0,0,canvasElement.width, canvasElement.height);
     var firstTileX = Math.floor(Math.max(playerPos.x - 6, 0));
-    var lastTileX = Math.floor(Math.min(playerPos.x + 6, terrain[0].length));
+    var lastTileX = Math.floor(Math.min(playerPos.x + 7, terrain[0].length));
     var firstTileY = Math.floor(Math.max(playerPos.y - 4, 0));
-    var lastTileY = Math.floor(Math.min(playerPos.y + 4, terrain.length));
+    var lastTileY = Math.floor(Math.min(playerPos.y + 5, terrain.length));
     for ( var idxY = firstTileY ; idxY < lastTileY ; idxY++ ) {
         var tileYposition = centerY - ((playerPos.y - idxY) * tileData.size) - tileData.size/2;
         for ( var idxX = firstTileX ; idxX < lastTileX ; idxX++ ) {
