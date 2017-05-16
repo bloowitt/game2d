@@ -25,7 +25,7 @@ window.game2d.model.terrain =
 [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
 ];
 
-window.game2d.model.player = { pos: {x:1.0, y:8.0}, vtr: {x:0, y:0}, speed: 2};
+window.game2d.model.player = { pos: {x:1.0, y:8.0}, vtr: {x:0, y:0}, speed: 4};
 
 // CONTROLLER PARTS
 window.game2d.controller = window.game2d.controller || {};
@@ -38,35 +38,8 @@ window.game2d.controller.decreaseAbsValueByAmount = function(quantity, amount){
     }
 };
 
-window.game2d.controller.getUpdatedVector = function(playerVector, keyStatus, speed) {
-    var x = playerVector.x; 
-    var y = playerVector.y;
-    var capAbsValue = function(value, cap){
-        var valueAbs = Math.abs(value);
-        if (valueAbs > cap){
-            return cap * valueAbs/value; 
-        }
-        return value;
-    };
-    if (keyStatus.isDown(keyStatus.UP)){
-        y -= 1;
-    }
-    if (keyStatus.isDown(keyStatus.DOWN)){
-        y += 1;
-    }
-    if (keyStatus.isDown(keyStatus.RIGHT)){
-        x += 1;
-    }
-    if (keyStatus.isDown(keyStatus.LEFT)){
-        x -= 1;
-    }
-    // reduce the movement by the speed for this iteration
-    x = x - x * speed;
-    y = y - y * speed;
-    return {x: capAbsValue(x, 1), y: capAbsValue(y, 1)};
-};
-
-window.game2d.controller.getUpdatedPosition= function(pos, vtr, terrain, speed){
+window.game2d.controller.getNewPlayerData= function(playerData, keyStatus, terrain, seconds){
+    //functions used inside the method
     var maintainWithinBounds = function(value, minBound, maxBound){
         if (value < minBound){
             return minBound;
@@ -76,21 +49,69 @@ window.game2d.controller.getUpdatedPosition= function(pos, vtr, terrain, speed){
         }
         return value;
     };
-    var x = pos.x + vtr.x * speed;
-    var y = pos.y + vtr.y * speed;
-    if (terrain[Math.floor(y)][Math.floor(x+0.5)] == 1){
+    var capAbsValue = function(value, cap){
+        var valueAbs = Math.abs(value);
+        if (valueAbs > cap){
+            return cap * valueAbs/value; 
+        }
+        return value;
+    };
+    var capAbsToOne = function(value){
+        return capAbsValue(value,1);
+    };
+    // Very roundabout way of getting vector modifiers from keys.
+    // I'm not proud of this but it seems like it could work.
+    var getModifierFromKeys = function(keyStatus, modifiersAndValues){
+        // Biggest overengineering ever?
+        var valueToReturn = 0;
+        for(var element in modifiersAndValues){
+            if (keyStatus.isDown(modifiersAndValues[element].modifier)){
+                valueToReturn = valueToReturn + modifiersAndValues[element].value;
+            }
+        }
+        return valueToReturn;
+    };
+    var getHorizontalKeys = function(keyStatus){
+        return getModifierFromKeys(keyStatus, 
+            [{modifier:keyStatus.LEFT, value:-1},
+            {modifier:keyStatus.RIGHT, value:1}]);
+    };
+    var getVerticalKeys = function(keyStatus){
+        return getModifierFromKeys(keyStatus, 
+            [{modifier:keyStatus.UP, value:-1},
+            {modifier:keyStatus.DOWN, value:1}]);
+    };
+    var modifierX = getHorizontalKeys(keyStatus)
+    var modifierY = getVerticalKeys(keyStatus)
+
+    // Add modifier and reduce the movement by the speed for this iteration.
+    var vtrX = capAbsValue(playerData.vtr.x + modifierX, 1.2) * (1-(playerData.speed*seconds));
+    var vtrY = capAbsValue(playerData.vtr.y + modifierY, 1.2) * (1-(playerData.speed*seconds));
+
+    var posX = playerData.pos.x + vtrX * playerData.speed * seconds;
+    var posY = playerData.pos.y + vtrY * playerData.speed * seconds;
+    
+    // Pending collisions again
+    /*
+    if (terrain[Math.floor(y)][Math.floor(x+1)] == 1){
+        x = Math.floor(x) -0.5;
+    }
+    if (terrain[Math.floor(y)][Math.floor(x-1)] == 1){
         x = Math.floor(x) +0.5;
     }
-    if (terrain[Math.floor(y)][Math.floor(x-0.5)] == 1){
-        x = Math.floor(x) +0.5;
+    if (terrain[Math.floor(y+1)][Math.floor(x)] == 1){
+        y = Math.floor(y) - 0.5;
     }
-    if (terrain[Math.floor(y+0.5)][Math.floor(x)] == 1){
+    if (terrain[Math.floor(y-1)][Math.floor(x)] == 1){
         y = Math.floor(y) + 0.5;
-    }
-    if (terrain[Math.floor(y-0.5)][Math.floor(x)] == 1){
-        y = Math.floor(y) + 0.5;
-    }
-    return {x: maintainWithinBounds(x, 0, terrain[0].length), y: maintainWithinBounds(y, 0, terrain.length)};
+    }*/
+    return {
+        pos:{x: posX, y:posY},
+        vtr:{x: vtrX, y: vtrY},
+        speed: playerData.speed
+    };
+    //return {x: capAbsValue(x, 1), y: capAbsValue(y, 1)};
+    //return {x: maintainWithinBounds(x, 0, terrain[0].length), y: maintainWithinBounds(y, 0, terrain.length)};
 };
 
 window.game2d.controller.moveStuff = function(){
@@ -99,11 +120,13 @@ window.game2d.controller.moveStuff = function(){
     }
     var now = Date.now();
     var ellapsedSeconds = (now - window.game2d.controller.lastTick)/1000;
-    var playerData = window.game2d.model.player;
-    var keyStatus = window.game2d.controller.keyStatus;
-    var speed = playerData.speed * ellapsedSeconds;
-    playerData.vtr = window.game2d.controller.getUpdatedVector(playerData.vtr, keyStatus, speed);
-    playerData.pos = window.game2d.controller.getUpdatedPosition(playerData.pos, playerData.vtr, window.game2d.model.terrain, speed);
+    window.game2d.model.player = 
+        window.game2d.controller.getNewPlayerData(
+            window.game2d.model.player, 
+            window.game2d.controller.keyStatus, 
+            window.game2d.model.terrain, 
+            ellapsedSeconds);
+    console.log(window.game2d.model.player.vtr.x, window.game2d.model.player.vtr.y);
     window.game2d.controller.lastTick = now;
     requestAnimationFrame(window.game2d.controller.moveStuff); 
 };
