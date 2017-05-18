@@ -16,7 +16,7 @@ window.game2d.model.terrain =
 [1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,1,1,1,0,1],
 [1,1,1,0,1,1,1,1,1,1,1,0,1,1,1,1,0,0,0,0,0,0,0,1,0,0,1],
 [1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,1],
-[1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1],
+[1,1,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1],
 [1,0,0,0,0,0,0,0,0,2,2,2,0,0,0,1,0,0,0,0,0,1,0,1,1,1,1],
 [1,1,1,1,1,1,1,0,0,2,3,2,0,0,0,1,1,1,0,1,1,1,0,0,0,0,1],
 [1,0,0,0,0,0,1,0,0,2,2,2,0,0,0,1,0,0,0,0,0,1,0,0,0,0,1],
@@ -71,43 +71,76 @@ window.game2d.controller.getNewPlayerData= function(playerData, keyStatus, terra
         }
         return valueToReturn;
     };
-    var getHorizontalKeys = function(keyStatus){
-        return getModifierFromKeys(keyStatus, 
-            [{modifier:keyStatus.LEFT, value:-1},
-            {modifier:keyStatus.RIGHT, value:1}]);
-    };
-    var getVerticalKeys = function(keyStatus){
-        return getModifierFromKeys(keyStatus, 
+    var getVectorModificationsFromKeys = function(keyStatus){
+        return {
+            x: getModifierFromKeys(keyStatus, 
+            [{modifier:keyStatus.LEFT, value:-1},   
+            {modifier:keyStatus.RIGHT, value:1}]),
+            y: getModifierFromKeys(keyStatus, 
             [{modifier:keyStatus.UP, value:-1},
-            {modifier:keyStatus.DOWN, value:1}]);
+            {modifier:keyStatus.DOWN, value:1}])
+        }
     };
-    var modifierX = getHorizontalKeys(keyStatus)
-    var modifierY = getVerticalKeys(keyStatus)
+    var getNewPlayerPosition = function(position, vector, speed, seconds){
+        return {
+            x: position.x + vector.x * speed * seconds, 
+            y: position.y + vector.y * speed * seconds
+        };
+    };
+    var recalculateVectorFromCollisions = function(position, newPosition, vector, terrain){
+        // Cases where you have to invert the horizontal vector:
+        // If we are going out of bounds on the left ( position.x - vector.x < 0)
+        // If we are going out of bounds on the right ( position.x + vector.x > terrain[0].length-1)
+        // If we are going to cross any tile that's blocked (1) on the right ()
+        var playerMargin = 0.1;
+        var checkBounds = function(newPosition, size){
+            if (newPosition < -playerMargin){
+                return true;
+            }
+            if (newPosition > size-1 + playerMargin) {
+                return true;
+            }
+            return false;
+        };
+        var checkCollisions = function(curPos, newPos, terrainRow){
+            for (var i = curPos; i<=newPos; i++){
+                if (i >= terrainRow.length){
+                    return true;
+                }
+                if (terrainRow[i] == 1){
+                    return true;
+                }
+            }
+            return false;
+        }
+        var invertX = checkBounds(newPosition.x, terrain[0].length);
+        var invertY = checkBounds(newPosition.y, terrain.length);
+        return {
+            x: invertX? -vector.x: vector.x,
+            y: invertY? -vector.y: vector.y
+        }
+    };
+    
+    // Get the vector modifications from pressed keys
+    var modifierVector = getVectorModificationsFromKeys(keyStatus);
 
     // Add modifier and reduce the movement by the speed for this iteration.
-    var vtrX = capAbsValue(playerData.vtr.x + modifierX, 1.2) * (1-(playerData.speed*seconds));
-    var vtrY = capAbsValue(playerData.vtr.y + modifierY, 1.2) * (1-(playerData.speed*seconds));
+    var vector = {
+        x: capAbsValue(playerData.vtr.x + modifierVector.x, 1.2) * (1-(playerData.speed*seconds)),
+        y: capAbsValue(playerData.vtr.y + modifierVector.y, 1.2) * (1-(playerData.speed*seconds))
+    };
 
-    var posX = playerData.pos.x + vtrX * playerData.speed * seconds;
-    var posY = playerData.pos.y + vtrY * playerData.speed * seconds;
+    // Update position
+    var position = getNewPlayerPosition(playerData.pos, vector, playerData.speed, seconds);
+
+    // Collision detection
+    vector = recalculateVectorFromCollisions(playerData.pos, position, vector, terrain);
+    // Update position (good one)
+    position = getNewPlayerPosition(playerData.pos, vector, playerData.speed, seconds);
     
-    // Pending collisions again
-    /*
-    if (terrain[Math.floor(y)][Math.floor(x+1)] == 1){
-        x = Math.floor(x) -0.5;
-    }
-    if (terrain[Math.floor(y)][Math.floor(x-1)] == 1){
-        x = Math.floor(x) +0.5;
-    }
-    if (terrain[Math.floor(y+1)][Math.floor(x)] == 1){
-        y = Math.floor(y) - 0.5;
-    }
-    if (terrain[Math.floor(y-1)][Math.floor(x)] == 1){
-        y = Math.floor(y) + 0.5;
-    }*/
     return {
-        pos:{x: posX, y:posY},
-        vtr:{x: vtrX, y: vtrY},
+        pos:position,
+        vtr:vector,
         speed: playerData.speed
     };
     //return {x: capAbsValue(x, 1), y: capAbsValue(y, 1)};
@@ -126,7 +159,6 @@ window.game2d.controller.moveStuff = function(){
             window.game2d.controller.keyStatus, 
             window.game2d.model.terrain, 
             ellapsedSeconds);
-    console.log(window.game2d.model.player.vtr.x, window.game2d.model.player.vtr.y);
     window.game2d.controller.lastTick = now;
     requestAnimationFrame(window.game2d.controller.moveStuff); 
 };
