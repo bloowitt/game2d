@@ -88,36 +88,26 @@ window.game2d.controller.getNewPlayerData= function(playerData, keyStatus, terra
         };
     };
     var recalculateVectorFromCollisions = function(position, newPosition, vector, terrain){
-        // Cases where you have to invert the horizontal vector:
-        // If we are going out of bounds on the left ( position.x - vector.x < 0)
-        // If we are going out of bounds on the right ( position.x + vector.x > terrain[0].length-1)
-        // If we are going to cross any tile that's blocked (1) on the right ()
-        var playerMargin = 0.1;
-        var checkBounds = function(newPosition, size){
-            if (newPosition < -playerMargin){
-                return true;
-            }
-            if (newPosition > size-1 + playerMargin) {
-                return true;
-            }
-            return false;
-        };
-        var checkCollisions = function(curPos, newPos, terrainRow){
-            for (var i = curPos; i<=newPos; i++){
-                if (i >= terrainRow.length){
-                    return true;
-                }
-                if (terrainRow[i] == 1){
-                    return true;
-                }
-            }
-            return false;
+        // TODO this should go 
+        var xVecToRet = vector.x;
+        if (newPosition.x != position.x){
+            if (newPosition.x < 0 || newPosition.x > terrain[0].length-1){
+                xVecToRet = -xVecToRet;
+            } else if ( terrain[Math.floor(newPosition.y)][Math.floor(newPosition.x)] === 1 ){
+                xVecToRet = -xVecToRet
+            } 
         }
-        var invertX = checkBounds(newPosition.x, terrain[0].length);
-        var invertY = checkBounds(newPosition.y, terrain.length);
+        var yVectToRet = vector.y;
+        if (newPosition.y != position.y) {
+            if (newPosition.y < 0 || newPosition.y > terrain.length-1){
+                yVectToRet = -yVectToRet;
+            } else if ( false ){
+                yVectToRet = -yVectToRet;
+            }
+        }
         return {
-            x: invertX? -vector.x: vector.x,
-            y: invertY? -vector.y: vector.y
+            x: xVecToRet,
+            y: yVectToRet
         }
     };
     
